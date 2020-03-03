@@ -26,6 +26,26 @@ module.exports = function* save(next) {
   //      length: 9883
   var pkg = this.request.body;
   var username = this.user.name;
+  const {name: pkgName, } = pkg;
+  const isInScope = pkgName.startsWith('@');
+  if(!isInScope){
+    this.status = 400;
+    this.body = {
+      error: 'pkg.name is error',
+      reason: 'package.name is only in scope'
+    };
+    return;
+  }
+  const scopeName = pkgName.split('/')[0];
+  const isOwnerScope = `@${username}` === scopeName;
+  if(!isOwnerScope){
+    this.status = 400;
+    this.body = {
+      error: 'pkg.name is error',
+      reason: 'yor not access publish '
+    };
+    return;
+  }
   var name = this.params.name || this.params[0];
   var filename = Object.keys(pkg._attachments || {})[0];
   var version = Object.keys(pkg.versions || {})[0];

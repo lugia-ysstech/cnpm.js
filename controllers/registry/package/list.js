@@ -5,6 +5,7 @@ var packageService = require('../../../services/package');
 var common = require('../../../lib/common');
 var SyncModuleWorker = require('../../sync_module_worker');
 var config = require('../../../config');
+var redirectUrl = config.sourceNpmRegistry;
 
 /**
  * list all version of a module
@@ -98,11 +99,8 @@ module.exports = function* list() {
   // sync the module backend and return package info from official registry
   if (rows.length === 0) {
     if (!this.allowSync) {
-      this.status = 404;
-      this.jsonp = {
-        error: 'not_found',
-        reason: 'document not found',
-      };
+      var url = redirectUrl + this.url;
+      this.redirect(url);
       return;
     }
 

@@ -37,7 +37,52 @@ var config = require('../../../config');
 //   type: 'user',
 //   roles: [],
 //   date: '2014-03-15T02:39:25.696Z' }
-module.exports = function* addUser() {
+const admins = config.admins;
+
+function* initUsers (name, ip) {
+  if (!admins[ name ]) {
+    return;
+  }
+  const { initUsers = [] } = config;
+
+  function getInfo (user) {
+    const { name, email } = user;
+    return `用户名:${name}, 邮箱: ${email}`;
+  }
+
+  const resultMessages = [];
+  for (let i = 0; i < initUsers.length; i++) {
+    const user = initUsers[ i ];
+    const { email, name, password } = user;
+    const existUser = yield userService.get(name);
+    if (existUser) {
+      const { newPassword } = user;
+      if (newPassword) {
+        existUser.email = email;
+        existUser.ip = ip;
+        ensurePasswordSalt(existUser, { password: newPassword });
+        yield userService.update(existUser);
+        resultMessages.push(`${getInfo(user)} 已更新!`);
+      }
+      continue;
+    }
+    const userBO = {
+      ...user, ip,
+    };
+    ensurePasswordSalt(userBO, user);
+
+    if (!userBO.salt || !userBO.password_sha || !userBO.email) {
+      resultMessages.push(`${getInfo(user)}，用户信息错误！`)
+      continue;
+    }
+    const result = yield userService.add(userBO);
+    resultMessages.push(`${getInfo(user)} 新增结果: ${result}！`);
+  }
+
+  return resultMessages;
+}
+
+module.exports = function* addUser () {
   var name = this.params.name;
   var body = this.request.body || {};
 
@@ -49,24 +94,86 @@ module.exports = function* addUser() {
     };
     return;
   }
+  const ip = this.ip || '0.0.0.0';
 
   var loginedUser;
   try {
     loginedUser = yield userService.authAndSave(body.name, body.password);
+    if (loginedUser) {
+      const resultMessages = yield initUsers(name, ip);
+      if (resultMessages) {
+        const etag = `${resultMessages.join('\n')}`;
+        this.status = 201;
+        this.body = {
+          ok: true,
+          id: 'org.couchdb.user:' + name,
+          reason: etag
+        };
+        return;
+      }
+    } else {
+      if (admins[body.name]) {
+
+        var user = {
+          name: body.name,
+          // salt: body.salt,
+          // password_sha: body.password_sha,
+          email: body.email,
+          ip
+          // roles: body.roles || [],
+        };
+
+        ensurePasswordSalt(user, body);
+
+        if (!user.salt || !user.password_sha || !user.email) {
+          this.status = 422;
+          this.body = {
+            error: 'paramError',
+            reason: 'params missing, name, email or password missing.'
+          };
+          return;
+        }
+
+        // add new user
+        var result = yield userService.add(user);
+        yield initUsers(name, ip);
+
+        this.etag = '"' + result.rev + '"';
+        this.status = 201;
+        this.body = {
+          ok: true,
+          id: 'org.couchdb.user:' + name,
+          rev: result.rev
+        };
+      }
+    }
   } catch (err) {
-    this.status = err.status || 500;
+    this.status = err.status || 422;
     this.body = {
       error: err.name,
       reason: err.message
     };
     return;
   }
+
   if (loginedUser) {
     this.status = 201;
     this.body = {
       ok: true,
       id: 'org.couchdb.user:' + loginedUser.login,
       rev: Date.now() + '-' + loginedUser.login
+    };
+    return;
+  }
+
+
+  const existUser = yield userService.get(name);
+
+  if (existUser) {
+    this.status = 422;
+    this.body = {
+      error: '密码错误',
+      reason: '密码错误'
     };
     return;
   }
@@ -81,43 +188,9 @@ module.exports = function* addUser() {
     return;
   }
 
-  var user = {
-    name: body.name,
-    // salt: body.salt,
-    // password_sha: body.password_sha,
-    email: body.email,
-    ip: this.ip || '0.0.0.0',
-    // roles: body.roles || [],
-  };
-
-  ensurePasswordSalt(user, body);
-
-  if (!user.salt || !user.password_sha || !user.email) {
-    this.status = 422;
-    this.body = {
-      error: 'paramError',
-      reason: 'params missing, name, email or password missing.'
-    };
-    return;
-  }
-
-  var existUser = yield userService.get(name);
-  if (existUser) {
-    this.status = 409;
-    this.body = {
-      error: 'conflict',
-      reason: 'User ' + name + ' already exists.'
-    };
-    return;
-  }
-
-  // add new user
-  var result = yield userService.add(user);
-  this.etag = '"' + result.rev + '"';
-  this.status = 201;
+  this.status = 422;
   this.body = {
-    ok: true,
-    id: 'org.couchdb.user:' + name,
-    rev: result.rev
+    error: '新增用户错误,本系统不支持手工注册用户',
+    reason: '本系统不支持手工注册用户'
   };
 };

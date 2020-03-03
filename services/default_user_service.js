@@ -28,6 +28,7 @@ function convertToUser(row) {
     html_url: 'http://cnpmjs.org/~' + row.name,
     avatar_url: '',
     im_url: '',
+    rev: row.rev,
     site_admin: isAdmin(row.name),
     scopes: config.scopes,
   };
@@ -87,6 +88,19 @@ proto.get = function* (login) {
     return null;
   }
   return convertToUser(row);
+};
+
+/**
+ * Get user(full) by login name
+ * @param  {String} login  login name
+ * @return {User}
+ */
+proto.getItem = function* (login) {
+  var row = yield User.findByName(login);
+  if (!row) {
+    return null;
+  }
+  return (row);
 };
 
 /**

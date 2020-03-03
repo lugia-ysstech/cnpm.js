@@ -15,6 +15,7 @@ var logger = require('../common/logger');
 var renderMarkdown = require('../common/markdown').render;
 var auth = require('../middleware/auth');
 var proxyToNpm = require('../middleware/proxy_to_npm');
+var proxyToNpmForSearch = require('../middleware/proxy_to_npm_for_search');
 var routes = require('../routes/web');
 var config = require('../config');
 var jsonp = require('koa-safe-jsonp');
@@ -45,9 +46,8 @@ if (config.pagemock) {
 app.use(opensearch);
 app.keys = ['todokey', config.sessionSecret];
 app.proxy = true;
-app.use(proxyToNpm({
-  isWeb: true
-}));
+
+app.use(proxyToNpmForSearch());
 app.use(bodyParser({ jsonLimit: config.jsonLimit, strict: false }));
 app.use(auth());
 app.use(notFound);

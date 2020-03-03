@@ -9,8 +9,10 @@ var os = require('os');
 var version = require('../package.json').version;
 
 var root = path.dirname(__dirname);
-var dataDir = process.env.CNPM_DATA_DIR ;
-
+var dataDir = path.join(process.env.CNPM_DATA_DIR || root, 'cnpmjs');
+var host = '127.0.0.1';
+let registryPort = 5001;
+let webPort = 5002;
 var config = {
   version: version,
   dataDir: dataDir,
@@ -25,8 +27,8 @@ var config = {
    * server configure
    */
 
-  registryPort: 7001,
-  webPort: 7002,
+  registryPort: registryPort,
+  webPort: webPort,
   bindingHost: '0.0.0.0', // binding on 0.0.0.0 for outside of container access
 
   // debug mode
@@ -60,13 +62,6 @@ var config = {
 
   enableCompress: false, // enable gzip response or not
 
-  // default system admins
-  admins: {
-    // name: email
-    fengmk2: 'fengmk2@gmail.com',
-    admin: 'admin@cnpmjs.org',
-    dead_horse: 'dead_horse@qq.com',
-  },
 
   // email notification for errors
   // check https://github.com/andris9/Nodemailer for more informations
@@ -98,16 +93,16 @@ var config = {
    */
 
   database: {
-    db: 'cnpmjs_test',
-    username: 'root',
-    password: '',
+    db: 'cnpm',
+    username: 'liguoxin',
+    password: '999999',
 
     // the sql dialect of the database
     // - currently supported: 'mysql', 'sqlite', 'postgres', 'mariadb'
     dialect: 'mysql',
 
-    // the Docker container network hostname defined at docker-compose.yml
-    host: 'mysql-db',
+    // custom host; default: 127.0.0.1
+    host: '192.168.102.89',
 
     // custom port; default: 3306
     port: 3306,
@@ -135,7 +130,7 @@ var config = {
   downloadRedirectToNFS: false,
 
   // registry url name
-  registryHost: '127.0.0.1:7001',
+  registryHost: `${host}:${registryPort}`,
 
   /**
    * registry mode config
@@ -147,7 +142,23 @@ var config = {
   enablePrivate: false,
 
   // registry scopes, if don't set, means do not support scopes
-  scopes: [ '@cnpm', '@cnpmtest', '@cnpm-test' ],
+  scopes: [ "@lugia" ],
+  initUsers: [
+    {
+      name: 'test1',
+      password: '123456',
+      email: 'lgx@ysstech.com'
+    }, {
+      name: 'test2',
+      password: '123456',
+      email: 'lgx@ysstech.com'
+    },
+  ],
+  // default system admins
+  admins: {
+    // name: email
+    admin: 'lugia@ysstech.com',
+  },
 
   // some registry already have some private packages in global scope
   // but we want to treat them as scoped private packages,
@@ -196,11 +207,11 @@ var config = {
   topPopular: 100,
 
   // sync devDependencies or not, default is false
-  syncDevDependencies: false,
+  syncDevDependencies: true,
 
   // changes streaming sync
   syncChangesStream: false,
-  handleSyncRegistry: 'http://127.0.0.1:7001',
+  handleSyncRegistry: `${host}:${registryPort}`,
 
   // badge subject on http://shields.io/
   badgePrefixURL: 'https://img.shields.io/badge',

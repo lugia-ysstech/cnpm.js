@@ -9,8 +9,10 @@ var os = require('os');
 var version = require('../package.json').version;
 
 var root = path.dirname(__dirname);
-var dataDir = path.join(process.env.HOME || root, '.cnpmjs.org');
-
+var dataDir = path.join(process.env.CNPM_DATA_DIR || root, 'cnpmjs');
+var host = '127.0.0.1';
+let registryPort = 5001;
+let webPort = 5002;
 var config = {
   version: version,
   dataDir: dataDir,
@@ -18,16 +20,16 @@ var config = {
   /**
    * Cluster mode
    */
-  enableCluster: false,
-  numCPUs: os.cpus().length,
+  enableCluster: true,
+  numCPUs: 8,
 
   /*
    * server configure
    */
 
-  registryPort: 7001,
-  webPort: 7002,
-  bindingHost: '127.0.0.1', // only binding on 127.0.0.1 for local access
+  registryPort: registryPort,
+  webPort: webPort,
+  bindingHost: '127.0.0.1', // binding on 0.0.0.0 for outside of container access
 
   // debug mode
   // if in debug mode, some middleware like limit wont load
@@ -60,13 +62,6 @@ var config = {
 
   enableCompress: false, // enable gzip response or not
 
-  // default system admins
-  admins: {
-    // name: email
-    fengmk2: 'fengmk2@gmail.com',
-    admin: 'admin@cnpmjs.org',
-    dead_horse: 'dead_horse@qq.com',
-  },
 
   // email notification for errors
   // check https://github.com/andris9/Nodemailer for more informations
@@ -98,13 +93,13 @@ var config = {
    */
 
   database: {
-    db: 'cnpmjs_test',
-    username: 'root',
-    password: '',
+    db: 'cnpm',
+    username: 'lugia',
+    password: 'test',
 
     // the sql dialect of the database
     // - currently supported: 'mysql', 'sqlite', 'postgres', 'mariadb'
-    dialect: 'sqlite',
+    dialect: 'mysql',
 
     // custom host; default: 127.0.0.1
     host: '127.0.0.1',
@@ -122,7 +117,7 @@ var config = {
 
     // the storage engine for 'sqlite'
     // default store into ~/.cnpmjs.org/data.sqlite
-    storage: path.join(dataDir, 'data.sqlite'),
+    //storage: path.join(dataDir, 'data.sqlite'),
 
     logging: !!process.env.SQL_DEBUG,
   },
@@ -135,7 +130,7 @@ var config = {
   downloadRedirectToNFS: false,
 
   // registry url name
-  registryHost: 'r.cnpmjs.org',
+  registryHost: `${host}:${registryPort}`,
 
   /**
    * registry mode config
@@ -147,7 +142,22 @@ var config = {
   enablePrivate: false,
 
   // registry scopes, if don't set, means do not support scopes
-  scopes: [ '@cnpm', '@cnpmtest', '@cnpm-test' ],
+  scopes: [ "@lugia" ],
+
+  initUsers: [
+   {
+      name: 'lugia',
+      password: '123456',
+      newPassword: 'lugia',
+      email: 'lugia@ysstech.com'
+    }
+  ],
+
+  // default system admins
+  admins: {
+    // name: email
+    admin: 'lugia@ysstech.com',
+  },
 
   // some registry already have some private packages in global scope
   // but we want to treat them as scoped private packages,
@@ -196,13 +206,11 @@ var config = {
   topPopular: 100,
 
   // sync devDependencies or not, default is false
-  syncDevDependencies: false,
-  // try to remove all deleted versions from original registry
-  syncDeletedVersions: true,
+  syncDevDependencies: true,
 
   // changes streaming sync
   syncChangesStream: false,
-  handleSyncRegistry: 'http://127.0.0.1:7001',
+  handleSyncRegistry: `${host}:${registryPort}`,
 
   // badge subject on http://shields.io/
   badgePrefixURL: 'https://img.shields.io/badge',
@@ -226,20 +234,12 @@ var config = {
 
   // https://github.com/cnpm/cnpmjs.org/issues/1149
   // if enable this option, must create module_abbreviated and package_readme table in database
-  enableAbbreviatedMetadata: false,
+  enableAbbreviatedMetadata: true,
 
   // global hook function: function* (envelope) {}
   // envelope format please see https://github.com/npm/registry/blob/master/docs/hooks/hooks-payload.md#payload
   globalHook: null,
-
-  opensearch: {
-    host: '',
-  },
 };
-
-if (process.env.NODE_ENV === 'test') {
-  config.enableAbbreviatedMetadata = true;
-}
 
 if (process.env.NODE_ENV !== 'test') {
   var customConfig;

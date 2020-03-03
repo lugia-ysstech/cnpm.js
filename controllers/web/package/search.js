@@ -2,7 +2,10 @@
 
 var debug = require('debug')('cnpmjs.org:controllers:web:package:search');
 var packageService = require('../../../services/package');
+var config = require('../../../config');
+var redirectUrl = config.sourceNpmRegistry;
 
+redirectUrl = config.sourceNpmWeb || redirectUrl.replace('//registry.', '//');
 module.exports = function* search() {
   var params = this.params;
   var word = params.word || params[0];
@@ -18,12 +21,18 @@ module.exports = function* search() {
   });
 
   var match = null;
-  for (var i = 0; i < result.searchMatchs.length; i++) {
+  const searchResultCount = result.searchMatchs.length;
+  for (var i = 0; i < searchResultCount; i++) {
     var p = result.searchMatchs[i];
     if (p.name === word) {
       match = p;
       break;
     }
+  }
+  if(searchResultCount ===0){
+    var url = redirectUrl + this.url;
+    this.redirect(url);
+    return;
   }
 
   // return a json result

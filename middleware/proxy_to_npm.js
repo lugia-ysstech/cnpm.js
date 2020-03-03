@@ -1,50 +1,73 @@
 'use strict';
 
-/**
- * Module dependencies.
- */
-
 var debug = require('debug')('cnpmjs.org:middleware:proxy_to_npm');
 var config = require('../config');
 
-module.exports = function (options) {
+module.exports = function () {
   var redirectUrl = config.sourceNpmRegistry;
   var proxyUrls = [
     // /:pkg, dont contains scoped package
-    /^\/[\w\-\.]+$/,
+    // /:pkg/:versionOrTag
+    /^\/[\w\-\.]+(?:\/[\w\-\.]+)?$/,
     // /-/package/:pkg/dist-tags
     /^\/\-\/package\/[\w\-\.]+\/dist-tags/,
   ];
-  if (options && options.isWeb) {
-    redirectUrl = redirectUrl.replace('//registry.', '//');
-    proxyUrls = [
-      // /package/:pkg
-      /^\/package\/[\w\-\.]+$/,
-    ];
-  }
-  return function* proxyToNpm(next) {
+  var scopedUrls = [
+    // scoped package
+    /^\/(@[\w\-\.]+)\/[\w\-\.]+(?:\/[\w\-\.]+)?$/,
+    /^\/\-\/package\/(@[\w\-\.]+)\/[\w\-\.]+\/dist\-tags/,
+  ];
+
+  return function* proxyToNpm (next) {
     if (config.syncModel !== 'none') {
       return yield next;
     }
+
+    // syncModel === none
     // only proxy read requests
     if (this.method !== 'GET' && this.method !== 'HEAD') {
       return yield next;
     }
 
-    var pathname = this.path;
-    var match;
-    for (var i = 0; i < proxyUrls.length; i++) {
-      match = proxyUrls[i].test(pathname);
-      if (match) {
-        break;
+    var pathname = decodeURIComponent(this.path);
+
+    var isScoped = false;
+    var isPublichScoped = false;
+    // check scoped name
+    if (config.scopes && config.scopes.length > 0) {
+      for (var i = 0; i < scopedUrls.length; i++) {
+        const m = scopedUrls[ i ].exec(pathname);
+        if (m) {
+          isScoped = true;
+          if (config.scopes.indexOf(m[ 1 ]) !== -1) {
+            // internal scoped
+            isPublichScoped = false;
+          } else {
+            isPublichScoped = true;
+          }
+          break;
+        }
       }
     }
-    if (!match) {
-      return yield next;
+
+    var isPublich = false;
+    if (!isScoped) {
+      for (var i = 0; i < proxyUrls.length; i++) {
+        isPublich = proxyUrls[ i ].test(pathname);
+        if (isPublich) {
+          break;
+        }
+      }
     }
 
-    var url = redirectUrl + this.url;
-    debug('proxy to %s', url);
-    this.redirect(url);
+    if (isPublich || isPublichScoped) {
+      var url = redirectUrl + this.url;
+      debug('proxy isPublich: %s, isPublichScoped: %s, package to %s',
+        isPublich, isPublichScoped, url);
+      this.redirect(url);
+      return;
+    }
+
+    yield next;
   };
 };
